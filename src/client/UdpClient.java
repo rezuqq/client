@@ -18,7 +18,19 @@ public class UdpClient {
 
         int listenPort = 5002; // порт клиента
         DatagramSocket socket = new DatagramSocket(listenPort);
+        
+        // ---------- регистрация клиента на сервере ----------
+        String hello = "HELLO";
+        DatagramPacket helloPacket = new DatagramPacket(
+                hello.getBytes(),
+                hello.length(),
+                InetAddress.getByName("127.0.0.1"), // адрес сервера
+                6000                                 // порт сервера
+        );
+        socket.send(helloPacket);
 
+        System.out.println("Client registered on server");
+        
         System.out.println("UDP Client started, waiting for tasks...");
 
         while (true) {
@@ -29,6 +41,7 @@ public class UdpClient {
             socket.receive(packet);
 
             String msg = new String(packet.getData(), 0, packet.getLength());
+            System.out.println("Received task: " + msg);
 
             if (!msg.startsWith("TASK;"))
                 continue;
@@ -52,8 +65,8 @@ public class UdpClient {
             DatagramPacket respPacket = new DatagramPacket(
                     out,
                     out.length,
-                    packet.getAddress(),   // адрес сервера
-                    packet.getPort()       // порт сервера
+                    packet.getAddress(),   // адрес отправителя TASK
+                    packet.getPort()       // порт отправителя TASK
             );
 
             socket.send(respPacket);
