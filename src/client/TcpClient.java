@@ -10,40 +10,44 @@ import java.net.InetAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+
 
 /**
  *
  * @author admin
  */
-public class UdpClient {
+public class TcpClient {
 
     public static void main(String[] args) throws Exception {
 
-        int listenPort = 5001; // порт клиента
-        DatagramSocket socket = new DatagramSocket(listenPort);
-        
-        // регистрация клиента на сервере
-        String hello = "HELLO";
-        DatagramPacket helloPacket = new DatagramPacket(
-                hello.getBytes(),
-                hello.length(),
-                InetAddress.getByName("127.0.0.1"), 
-                6000
-        );
-        socket.send(helloPacket);
+        // Подключаемся к серверу
+        Socket socket = new Socket("127.0.0.1", 6000);
+        System.out.println("Connected to TCP server");
 
+        BufferedReader in = new BufferedReader(
+                new InputStreamReader(socket.getInputStream())
+        );
+        PrintWriter out = new PrintWriter(
+                socket.getOutputStream(), true
+        );
+
+        // Регистрируемся
+        out.println("HELLO");
         System.out.println("Client registered on server");
-        
-        System.out.println("UDP Client started, waiting for tasks...");
 
         while (true) {
 
-            // получение задачи 
-            byte[] buf = new byte[1024];
-            DatagramPacket packet = new DatagramPacket(buf, buf.length);
-            socket.receive(packet);
+            // Ждём задачу
+            String msg = in.readLine();
+            if (msg == null) {
+                System.out.println("Server closed connection");
+                break;
+            }
 
-            String msg = new String(packet.getData(), 0, packet.getLength());
             System.out.println("Received task: " + msg);
 
             if (!msg.startsWith("TASK;"))
@@ -58,39 +62,25 @@ public class UdpClient {
                 if (p.startsWith("h=")) h = Double.parseDouble(p.substring(2));
             }
 
-            // вычисление с обработкой ошибок
             try {
                 double result = calculateIntegralMultithread(a, b, h);
-                String resp = "RESULT;value=" + result;
-                byte[] out = resp.getBytes();
-                DatagramPacket respPacket = new DatagramPacket(
-                        out,
-                        out.length,
-                        packet.getAddress(),
-                        packet.getPort()
-                );
-                socket.send(respPacket);
+                out.println("RESULT;value=" + result);
                 System.out.println("Sent result: " + result);
             } catch (Exception e) {
-                e.printStackTrace();
-                String resp = "RESULT;error=" + e.getMessage();
-                byte[] out = resp.getBytes();
-                DatagramPacket respPacket = new DatagramPacket(
-                        out,
-                        out.length,
-                        packet.getAddress(),
-                        packet.getPort()
-                );
-                socket.send(respPacket);
+                out.println("RESULT;error=" + e.getMessage());
                 System.out.println("Sent error: " + e.getMessage());
             }
         }
+
+        socket.close();
     }
 
     private static double calculateIntegralMultithread(double a, double b, double h) throws Exception {
         int threadsCount = 2;
-        ExecutorService executor = Executors.newFixedThreadPool(threadsCount);
-        Future<Double>[] futures = new Future[threadsCount];
+        java.util.concurrent.ExecutorService executor =
+                java.util.concurrent.Executors.newFixedThreadPool(threadsCount);
+
+        java.util.concurrent.Future<Double>[] futures = new java.util.concurrent.Future[threadsCount];
 
         double interval = (b - a) / threadsCount;
 
@@ -103,12 +93,12 @@ public class UdpClient {
         }
 
         double total = 0;
-        for (Future<Double> future : futures) {
-            total += future.get(); // ждём результат
+        for (java.util.concurrent.Future<Double> f : futures) {
+            total += f.get();
         }
 
         executor.shutdown();
         return total;
     }
-    
+
 }
